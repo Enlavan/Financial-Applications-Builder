@@ -1,0 +1,204 @@
+{
+  "schema_version": "2",
+  "dataset": "example_eod_observations",
+  "owner": {
+    "team_or_person": "fill in",
+    "contact": "fill in",
+    "on_call_for_fail": true
+  },
+  "endpoint": "/api/eod/{symbol}",
+  "natural_key": [
+    "listing_id",
+    "session_date",
+    "capture_id"
+  ],
+  "current_view_key": [
+    "listing_id",
+    "session_date"
+  ],
+  "date_semantics": "exchange session label",
+  "price_basis": "raw OHLC; separate total-return adjusted_close",
+  "volume_basis": "split-adjusted",
+  "currency_fields": [
+    "price_currency",
+    "price_unit_multiplier"
+  ],
+  "lineage_fields": [
+    "capture_id",
+    "retrieved_at",
+    "body_sha256",
+    "transform_version"
+  ],
+  "missing_policy": "preserve null, zero, absent record and no-access as distinct states",
+  "revision_policy": "immutable captures; versioned current normalized view",
+  "pagination": "endpoint-specific date windows; verify boundaries",
+  "coverage": "probe per symbol and interval; no completeness assumption",
+  "response_schema": {
+    "envelope": "json_array_of_objects",
+    "fields": {
+      "date": {
+        "type": "string",
+        "format": "YYYY-MM-DD",
+        "required": true,
+        "nullable": false,
+        "unit": "session date"
+      },
+      "open": {
+        "type": "number",
+        "required": true,
+        "nullable": true,
+        "unit": "price_currency"
+      },
+      "high": {
+        "type": "number",
+        "required": true,
+        "nullable": true,
+        "unit": "price_currency"
+      },
+      "low": {
+        "type": "number",
+        "required": true,
+        "nullable": true,
+        "unit": "price_currency"
+      },
+      "close": {
+        "type": "number",
+        "required": true,
+        "nullable": false,
+        "unit": "price_currency"
+      },
+      "adjusted_close": {
+        "type": "number",
+        "required": true,
+        "nullable": true,
+        "unit": "price_currency, split and dividend adjusted"
+      },
+      "volume": {
+        "type": "number",
+        "required": true,
+        "nullable": true,
+        "unit": "shares, split-adjusted"
+      }
+    },
+    "change_policy": {
+      "new_field": "ADDITIVE: WARN, record it, do not fail the run",
+      "missing_required_field": "BREAKING: FAIL, keep the capture, stop normalization",
+      "type_change": "BREAKING: FAIL",
+      "unit_or_currency_change": "BREAKING: FAIL; block derived values for the listing",
+      "null_in_non_nullable_field": "BREAKING: FAIL",
+      "non_json_or_html_body": "BREAKING: FAIL"
+    }
+  },
+  "freshness_sla": {
+    "basis": "user target derived from documented typical timing; not an EODHD guarantee",
+    "per_exchange": {
+      "US": {
+        "timezone": "America/New_York",
+        "warn_after_close": "PT1H",
+        "error_after_close": "PT2H",
+        "refinement_due_local": "07:30 next day"
+      },
+      "LSE": {
+        "timezone": "Europe/London",
+        "warn_after_close": "PT3H15M",
+        "error_after_close": "PT4H"
+      },
+      "XETRA": {
+        "timezone": "Europe/Berlin",
+        "warn_after_close": "PT3H15M",
+        "error_after_close": "PT4H"
+      },
+      "HK": {
+        "timezone": "Asia/Hong_Kong",
+        "warn_after_close": "PT3H15M",
+        "error_after_close": "PT4H"
+      }
+    },
+    "calendar": "a holiday or weekend is never a breach; due times come from the cached exchange calendar"
+  },
+  "completeness_min": {
+    "metric": "Q6 share of expected liquid listings present in the session partition",
+    "warn_below": 0.98,
+    "fail_below": 0.9
+  },
+  "checks": {
+    "Q1": {
+      "name": "key uniqueness",
+      "severity": "FAIL",
+      "threshold": "0 duplicates"
+    },
+    "Q2": {
+      "name": "OHLC bounds",
+      "severity": "WARN",
+      "threshold": "per row; FAIL if share > 0.005"
+    },
+    "Q3": {
+      "name": "incomplete bar",
+      "severity": "WARN",
+      "threshold": "any"
+    },
+    "Q4": {
+      "name": "volume non-negative",
+      "severity": "FAIL",
+      "threshold": "0 negative"
+    },
+    "Q5": {
+      "name": "freshness",
+      "severity": "FAIL",
+      "threshold": "freshness_sla.error_after_close"
+    },
+    "Q6": {
+      "name": "completeness",
+      "severity": "WARN",
+      "threshold": "completeness_min"
+    },
+    "Q7": {
+      "name": "row-count z-score",
+      "severity": "WARN",
+      "threshold": "abs(z) >= 3; FAIL >= 6"
+    },
+    "Q8": {
+      "name": "log-volume z-score",
+      "severity": "WARN",
+      "threshold": "abs(z) >= 3"
+    },
+    "Q9": {
+      "name": "null-rate drift",
+      "severity": "WARN",
+      "threshold": "> 2 pp; FAIL > 10 pp"
+    },
+    "Q10": {
+      "name": "stuck price with volume",
+      "severity": "WARN",
+      "threshold": ">= 5 sessions"
+    },
+    "Q11": {
+      "name": "factor jump without action",
+      "severity": "WARN",
+      "threshold": "abs(f - 1) > 0.001 + 0.0001 * (1/close_t + 1/close_t-1)"
+    },
+    "Q12": {
+      "name": "unit or currency change",
+      "severity": "FAIL",
+      "threshold": "any change; blocks derived values for the listing"
+    },
+    "Q13": {
+      "name": "identifier check digits",
+      "severity": "WARN",
+      "threshold": "any invalid ISIN or CUSIP"
+    },
+    "Q14": {
+      "name": "per-asset-class move",
+      "severity": "WARN",
+      "threshold": "see data-engineering-patterns.md section 4 Q14 table"
+    }
+  },
+  "tests": [
+    "typed fields",
+    "unique current key",
+    "OHLC range where known",
+    "unit consistency",
+    "capture lineage",
+    "contract diff against response_schema"
+  ]
+}
